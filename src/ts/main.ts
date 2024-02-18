@@ -77,11 +77,11 @@ class Sketch {
     this.colliders.push(new Glass(this.p, this.p.createVector(200, 500), this.p.createVector(1100, 500), tmpColor));
     this.colliders.push(new Glass(this.p, this.p.createVector(200, 900), this.p.createVector(1100, 900), tmpColor));
     
-    new Splitter(this.p, this, this.p.createVector(400, 400), 0, 100, this.p.color(255, 255, 255, 255));
+    new Splitter(this.p, this, this.p.createVector(this.canvasSize.x / 2, 400), 0, 100, this.p.color(255, 255, 255, 255));
     
     this.emitters = [];
     // this.emitters.push(new Emitter(this.p, this.emitterPos, this));
-    this.rays.push(new LightRay(this.p, this.canvasCenter, 0, this.colors.white));
+    this.rays.push(new LightRay(this.p, this.canvasCenter, 270, this.colors.white));
   }
 
   setup() {
@@ -91,7 +91,7 @@ class Sketch {
 
     this.p.background(this.colors.background);
     this.p.noiseDetail(4, 0.25);
-    // this.p.angleMode(this.p.DEGREES);
+    this.p.angleMode(this.p.DEGREES);
     
     this.p.frameRate(5);
     this.initialize();
@@ -143,4 +143,5 @@ new p5((p: p5) => {
   p.setup = () => sketch.setup();
   p.draw = () => sketch.draw();
   p.keyPressed = () => sketch.keyPressed();
+  (window as any).sketch = sketch;
 });

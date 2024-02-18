@@ -24,11 +24,11 @@ export class Collider {
     this.p.line(this.pos1.x, this.pos1.y, this.pos2.x, this.pos2.y);
   }
 
-  onCollision(ray: any, dir: p5.Vector) {
+  onCollision(ray: any, dir: p5.Vector): number {
     let normal = this.pos2.copy().sub(this.pos1).rotate(90).normalize();
     let incident = dir.copy();
     let reflection = incident.copy().sub(normal.copy().mult(2 * incident.dot(normal)));
 
-    return ray.p.atan2(reflection.y, reflection.x)
+    return ray.p.atan2(reflection.y, reflection.x);
   }
 }

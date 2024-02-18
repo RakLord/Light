@@ -7,7 +7,7 @@ export class Glass extends Collider {
     this.colliderType = "glass";
   }
 
-  onCollision(ray: any, dir: p5.Vector) {
+  onCollision(ray: any, dir: p5.Vector): number {
     // blend the color of the ray between the current color and the mirrors color
     // let c = this.p.color(this.color);
     // c.setAlpha(255);

@@ -629,17 +629,17 @@ class Sketch {
         this.colliders.push(new (0, _glass.Glass)(this.p, this.p.createVector(200, 200), this.p.createVector(1100, 200), tmpColor));
         this.colliders.push(new (0, _glass.Glass)(this.p, this.p.createVector(200, 500), this.p.createVector(1100, 500), tmpColor));
         this.colliders.push(new (0, _glass.Glass)(this.p, this.p.createVector(200, 900), this.p.createVector(1100, 900), tmpColor));
-        new (0, _splitter.Splitter)(this.p, this, this.p.createVector(400, 400), 0, 100, this.p.color(255, 255, 255, 255));
+        new (0, _splitter.Splitter)(this.p, this, this.p.createVector(this.canvasSize.x / 2, 400), 0, 100, this.p.color(255, 255, 255, 255));
         this.emitters = [];
         // this.emitters.push(new Emitter(this.p, this.emitterPos, this));
-        this.rays.push(new (0, _ray.LightRay)(this.p, this.canvasCenter, 0, this.colors.white));
+        this.rays.push(new (0, _ray.LightRay)(this.p, this.canvasCenter, 270, this.colors.white));
     }
     setup() {
         this.canvas = this.p.createCanvas(this.canvasSize.x, this.canvasSize.y);
         this.canvas.addClass("p5-canvas");
         this.p.background(this.colors.background);
         this.p.noiseDetail(4, 0.25);
-        // this.p.angleMode(this.p.DEGREES);
+        this.p.angleMode(this.p.DEGREES);
         this.p.frameRate(5);
         this.initialize();
     }
@@ -679,9 +679,10 @@ new (0, _p5Default.default)((p)=>{
     p.setup = ()=>sketch.setup();
     p.draw = ()=>sketch.draw();
     p.keyPressed = ()=>sketch.keyPressed();
+    window.sketch = sketch;
 });
 
-},{"p5":"7Uk5U","./collider":"iPWhW","./glass":"kqt60","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./splitter":"6ZSmx","./ray":"aWTGW"}],"7Uk5U":[function(require,module,exports) {
+},{"p5":"7Uk5U","./collider":"iPWhW","./glass":"kqt60","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./ray":"aWTGW","./splitter":"6ZSmx"}],"7Uk5U":[function(require,module,exports) {
 /*! p5.js v1.9.0 November 28, 2023 */ var global = arguments[3];
 !function(e1) {
     module.exports = e1();
@@ -32489,7 +32490,102 @@ class Glass extends (0, _colliderJs.Collider) {
     }
 }
 
-},{"./collider.js":"iPWhW","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"6ZSmx":[function(require,module,exports) {
+},{"./collider.js":"iPWhW","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"aWTGW":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "LightRay", ()=>LightRay);
+class LightRay {
+    constructor(p, pos, angle, color){
+        this.p = p;
+        this.pos = pos;
+        this.angle = angle;
+        this.path = [];
+        this.color = color;
+        this.maxCollisions = 2000;
+        this.angleEntropy = 0.0;
+        this.previousCollider = undefined;
+        this.closestPoint = undefined;
+        this.closestCollider = undefined;
+        this.closestDistance = Infinity;
+        this.teleportIndex;
+        this.teleporting = false;
+    }
+    rayTick(colliders) {
+        this.path.push(this.pos);
+        let dir = this.p.createVector(this.p.cos(this.angle), this.p.sin(this.angle));
+        let maxEnd = dir.copy().mult(5000).add(this.pos);
+        // loop over all the colliders and find when the ray intersects
+        this.closestPoint = undefined;
+        this.closestDistance = Infinity;
+        this.closestCollider = undefined;
+        for (const collider of colliders)if (collider !== this.previousCollider) {
+            const point = this.getIntersectionPoint(collider, maxEnd);
+            if (point) {
+                const distance = this.pos.dist(point);
+                if (distance < this.closestDistance && distance > 0.1) {
+                    this.closestDistance = distance;
+                    this.closestPoint = point;
+                    this.closestCollider = collider;
+                }
+            }
+        }
+        // console.log(this.path.length, this.teleportIndex)
+        if (this.path.length - 1 == this.teleportIndex) {
+            // console.log("Teleporting")
+            this.teleporting = true;
+            this.path[this.teleportIndex] = this.pos;
+        } else this.teleporting = false;
+        // If there is a collision
+        // console.log("Colllision: \nPoint:", this.closestPoint,"\nCollider:", this.closestCollider)
+        if (this.closestPoint && this.closestCollider) {
+            this.previousCollider = this.closestCollider;
+            this.path.push(this.closestPoint);
+            if (this.teleporting) {
+                this.p.stroke(this.p.color(255, 0, 0));
+                this.p.strokeWeight(2);
+                this.p.line(this.pos.x, this.pos.y, this.closestPoint.x, this.closestPoint.y);
+            } else {
+                this.p.stroke(this.color);
+                this.p.strokeWeight(2);
+                this.p.line(this.pos.x, this.pos.y, this.closestPoint.x, this.closestPoint.y);
+            }
+            this.angle = this.previousCollider.onCollision(this, dir);
+            if (this.angleEntropy != 0) this.angle += this.p.random(-this.angleEntropy, this.angleEntropy);
+            dir = this.p.createVector(this.p.cos(this.angle), this.p.sin(this.angle));
+            maxEnd = dir.copy().mult(5000).add(this.closestPoint);
+            this.pos = this.closestPoint;
+        }
+        this.maxCollisions--;
+    }
+    getIntersectionPoint(collider, maxEnd) {
+        // Colider line start/end points
+        let colliderPos1 = collider.pos1;
+        let colliderPos2 = collider.pos2;
+        // Ray start/end points
+        let pos1 = this.pos;
+        let pos2 = maxEnd;
+        // Calculate if the collider lines intersect witht he ray and return the position of intersection
+        let denominator = (colliderPos2.y - colliderPos1.y) * (pos2.x - pos1.x) - (colliderPos2.x - colliderPos1.x) * (pos2.y - pos1.y);
+        if (denominator === 0) return null;
+        let intersectionParameter1 = ((colliderPos2.x - colliderPos1.x) * (pos1.y - colliderPos1.y) - (colliderPos2.y - colliderPos1.y) * (pos1.x - colliderPos1.x)) / denominator;
+        let intersectionParameter2 = ((pos2.x - pos1.x) * (pos1.y - colliderPos1.y) - (pos2.y - pos1.y) * (pos1.x - colliderPos1.x)) / denominator;
+        if (intersectionParameter1 < 0 || intersectionParameter1 > 1 || intersectionParameter2 < 0 || intersectionParameter2 > 1) return null;
+        let x = pos1.x + intersectionParameter1 * (pos2.x - pos1.x);
+        let y = pos1.y + intersectionParameter1 * (pos2.y - pos1.y);
+        return this.p.createVector(x, y);
+    }
+    draw() {
+        // Function currently un-used
+        this.p.stroke(this.color);
+        this.p.strokeWeight(2);
+        // loop over the path and draw the line
+        for(let i = 0; i < this.path.length - 1; i++)// if the z index is 1 then ignore this line
+        if (this.path[i].z != 1) this.p.line(this.path[i].x, this.path[i].y, this.path[i + 1].x, this.path[i + 1].y);
+        else console.log("z=1", this.path[i]);
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"6ZSmx":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "Splitter", ()=>Splitter);
@@ -32513,9 +32609,18 @@ class Splitter {
         this.setup();
     }
     calculateNormal(pos1, pos2) {
-        let direction = (0, _p5Default.default).Vector.sub(pos2, pos1);
-        let angle = direction.heading() + this.p.HALF_PI; // Rotate by 90 degrees to get normal
-        return this.p.degrees(angle); // Return the angle in degrees
+        let splitterCenter = this.pos;
+        let midpoint = (0, _p5Default.default).Vector.lerp(pos1, pos2, 0.5);
+        let normal = (0, _p5Default.default).Vector.sub(midpoint, splitterCenter);
+        normal.normalize();
+        // this.p.stroke(255, 0, 0);
+        // this.p.strokeWeight(2);
+        // this.p.line(midpoint.x, midpoint.y, midpoint.x + normal.x * 20, midpoint.y + normal.y * 20);
+        let angle = normal.heading();
+        return angle;
+    // let direction = p5.Vector.sub(pos2, pos1);
+    // let angle = direction.heading() + this.p.HALF_PI;
+    // return angle;
     }
     setup() {
         let angleOffsetRadians = this.p.radians(120);
@@ -32523,17 +32628,9 @@ class Splitter {
         console.log("size", this.size);
         console.log("Center", this.pos);
         const center = this.pos.copy();
-        this.p.strokeWeight(this.width);
-        this.p.stroke(this.p.color(255, 0, 0, 255));
-        this.p.point(center.x, center.y);
-        let pos1 = this.p.createVector(center.x + this.size * this.p.cos(0), center.y + this.size * this.p.sin(0));
-        let pos2 = this.p.createVector(center.x + this.size * this.p.cos(angleOffsetRadians), center.y + this.size * this.p.sin(angleOffsetRadians));
-        let pos3 = this.p.createVector(center.x + this.size * this.p.cos(angleOffsetRadians * 2), center.y + this.size * this.p.sin(angleOffsetRadians * 2));
-        console.log("Pos1:", pos1.x, ",", pos1.y, "\n", "Pos2:", pos2.x, ",", pos2.y, "\n", "Pos3:", pos3.x, ",", pos3.y, "\n");
-        this.p.stroke(this.p.color(255, 0, 0, 255));
-        this.p.point(pos1.x, pos1.y);
-        this.p.point(pos2.x, pos2.y);
-        this.p.point(pos3.x, pos3.y);
+        let pos1 = this.p.createVector(center.x + this.size * Math.cos(0), center.y + this.size * Math.sin(0));
+        let pos2 = this.p.createVector(center.x + this.size * Math.cos(angleOffsetRadians), center.y + this.size * Math.sin(angleOffsetRadians));
+        let pos3 = this.p.createVector(center.x + this.size * Math.cos(angleOffsetRadians * 2), center.y + this.size * Math.sin(angleOffsetRadians * 2));
         let mid1 = (0, _p5Default.default).Vector.lerp(pos1, pos2, 0.5);
         let mid2 = (0, _p5Default.default).Vector.lerp(pos2, pos3, 0.5);
         let mid3 = (0, _p5Default.default).Vector.lerp(pos3, pos1, 0.5);
@@ -32583,138 +32680,32 @@ class SplitterPart extends (0, _colliderJs.Collider) {
         this.p.line(this.pos1.x, this.pos1.y, this.pos2.x, this.pos2.y);
     }
     onCollision(ray, dir) {
+        this.sketch.p.frameRate(2); // Debug
+        // Display the exit normals
+        const exitLineLen = 50;
+        this.p.strokeWeight(12);
+        this.p.stroke(0, 255, 0); // Exit 1 is green
+        this.p.line(this.exit1[0].x, this.exit1[0].y, this.exit1[0].x + this.p.cos(this.exit1[1]) * exitLineLen, this.exit1[0].y + this.p.sin(this.exit1[1]) * exitLineLen);
+        this.p.stroke(0, 0, 255); // Exit 2 is blue
+        this.p.line(this.exit2[0].x, this.exit2[0].y, this.exit2[0].x + this.p.cos(this.exit2[1]) * exitLineLen, this.exit2[0].y + this.p.sin(this.exit2[1]) * exitLineLen);
+        // This runs if the ray cap is hit
         if (this.sketch.rays.length > this.sketch.maxRays) {
             ray.pos = this.exit1[0].copy();
             ray.angle = this.exit1[1];
             return ray.angle;
         }
+        // create new ray - This works fine
+        // UNCOMMENT THIS IS ONLY DISABLED FOR DEBUGGING AND IT WORKS FINE
         let newRay = new (0, _rayJs.LightRay)(this.p, this.exit1[0].copy(), this.exit1[1], this.color);
         this.sketch.rays.push(newRay);
-        ray.pos = this.exit2[0].copy();
+        // Edit the current rayy  - This works (i think, its the drawing thats the issue)
+        ray.pos.set(this.exit2[0].copy());
         ray.angle = this.exit2[1];
+        ray.teleportIndex = ray.path.length;
         return ray.angle;
     }
 }
 
-},{"./ray.js":"aWTGW","./collider.js":"iPWhW","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","p5":"7Uk5U"}],"aWTGW":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "LightRay", ()=>LightRay);
-class LightRay {
-    constructor(p, pos, angle, color){
-        this.p = p;
-        this.pos = pos;
-        this.angle = angle;
-        this.path = [];
-        this.color = color;
-        this.maxCollisions = 2000;
-        this.angleEntropy = 0.0;
-        this.previousCollider = undefined;
-        this.closestPoint = undefined;
-        this.closestCollider = undefined;
-        this.closestDistance = Infinity;
-    }
-    rayTick(colliders) {
-        this.path.push(this.pos);
-        let dir = this.p.createVector(this.p.cos(this.angle), this.p.sin(this.angle));
-        let maxEnd = dir.copy().mult(5000).add(this.pos);
-        // loop over all the colliders and find when the ray intersects
-        this.closestPoint = undefined;
-        this.closestDistance = Infinity;
-        this.closestCollider = undefined;
-        colliders.forEach((collider)=>{
-            if (collider != this.previousCollider) {
-                let point = this.getIntersectionPoint(collider, maxEnd);
-                if (point) {
-                    let distance = this.pos.dist(point);
-                    if (distance < this.closestDistance && distance > 0.1) {
-                        this.closestDistance = distance;
-                        this.closestPoint = point;
-                        this.closestCollider = collider;
-                    }
-                }
-            }
-        });
-        // If there is a collision
-        console.log(typeof this.closestPoint);
-        if (this.closestPoint) {
-            this.previousCollider = this.closestCollider;
-            this.path.push(this.closestPoint);
-            this.p.stroke(this.color);
-            this.p.strokeWeight(2);
-            this.p.line(this.pos.x, this.pos.y, this.closestPoint.x, this.closestPoint.y);
-            this.angle = this.previousCollider.onCollision(this, dir);
-            if (this.angleEntropy != 0) this.angle += this.p.random(-this.angleEntropy, this.angleEntropy);
-            dir = this.p.createVector(this.p.cos(this.angle), this.p.sin(this.angle));
-            maxEnd = dir.copy().mult(5000).add(this.closestPoint);
-            this.pos = this.closestPoint;
-        }
-        this.maxCollisions--;
-    }
-    rayCast() {
-    // this.path.push(this.pos);
-    // let dir = this.p5.createVector(this.p5.cos(this.angle), this.p5.sin(this.angle));
-    // let maxEnd = dir.copy().mult(5000).add(this.pos);
-    // // loop over all the colliders and find when the ray intersects
-    // for (let i = 0; i < this.maxCollisions; i++) {
-    //   let closestPoint = null;
-    //   let closestDistance = Infinity;
-    //   let closestCollider = null;
-    //   colliders.forEach(collider => {
-    //     if (collider != this.previousCollider) {
-    //       let point = this.getIntersectionPoint(collider, maxEnd);
-    //       if (point) {
-    //         let distance = this.pos.dist(point);
-    //         if (distance < closestDistance && distance > 0.1) {
-    //           closestDistance = distance;
-    //           closestPoint = point;
-    //           closestCollider = collider;
-    //         }
-    //       }
-    //     }
-    //   });
-    //   // If there is a collision
-    //   if (closestPoint) {
-    //     this.previousCollider = closestCollider;
-    //     this.path.push(closestPoint);
-    //     this.p5.stroke(this.color);
-    //     this.p5.strokeWeight(2);
-    //     this.p5.line(this.pos.x, this.pos.y, closestPoint.x, closestPoint.y);
-    //     this.angle = closestCollider.onCollision(this, dir);
-    //     if (this.angleEntropy != 0) {
-    //      this.angle += this.p5.random(-this.angleEntropy, this.angleEntropy);
-    //     }
-    //     dir = this.p5.createVector(this.p5.cos(this.angle), this.p5.sin(this.angle));
-    //     maxEnd = dir.copy().mult(5000).add(closestPoint);
-    //     this.pos = closestPoint;
-    //   }
-    // }
-    }
-    getIntersectionPoint(collider, maxEnd) {
-        // Colider line start/end points
-        let colliderPos1 = collider.pos1;
-        let colliderPos2 = collider.pos2;
-        // Ray start/end points
-        let pos1 = this.pos;
-        let pos2 = maxEnd;
-        // Calculate if the collider lines intersect witht he ray and return the position of intersection
-        let denominator = (colliderPos2.y - colliderPos1.y) * (pos2.x - pos1.x) - (colliderPos2.x - colliderPos1.x) * (pos2.y - pos1.y);
-        if (denominator === 0) return null;
-        let intersectionParameter1 = ((colliderPos2.x - colliderPos1.x) * (pos1.y - colliderPos1.y) - (colliderPos2.y - colliderPos1.y) * (pos1.x - colliderPos1.x)) / denominator;
-        let intersectionParameter2 = ((pos2.x - pos1.x) * (pos1.y - colliderPos1.y) - (pos2.y - pos1.y) * (pos1.x - colliderPos1.x)) / denominator;
-        if (intersectionParameter1 < 0 || intersectionParameter1 > 1 || intersectionParameter2 < 0 || intersectionParameter2 > 1) return null;
-        let x = pos1.x + intersectionParameter1 * (pos2.x - pos1.x);
-        let y = pos1.y + intersectionParameter1 * (pos2.y - pos1.y);
-        return this.p.createVector(x, y);
-    }
-    draw() {
-        this.p.stroke(this.color);
-        this.p.strokeWeight(2);
-        // loop over the path and draw the line
-        for(let i = 0; i < this.path.length - 1; i++)this.p.line(this.path[i].x, this.path[i].y, this.path[i + 1].x, this.path[i + 1].y);
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["bMKAI","4j3ZX"], "4j3ZX", "parcelRequired41e")
+},{"p5":"7Uk5U","./collider.js":"iPWhW","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./ray.js":"aWTGW"}]},["bMKAI","4j3ZX"], "4j3ZX", "parcelRequired41e")
 
 //# sourceMappingURL=index.ca39cc5e.js.map

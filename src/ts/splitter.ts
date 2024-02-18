@@ -32,9 +32,20 @@ export class Splitter {
     }
 
     calculateNormal(pos1: p5.Vector, pos2: p5.Vector): number {
-        let direction = p5.Vector.sub(pos2, pos1);
-        let angle = direction.heading() + this.p.HALF_PI; // Rotate by 90 degrees to get normal
-        return this.p.degrees(angle); // Return the angle in degrees
+        let splitterCenter = this.pos;
+        let midpoint = p5.Vector.lerp(pos1, pos2, 0.5);
+        let normal = p5.Vector.sub(midpoint, splitterCenter);
+        normal.normalize();
+        
+        // this.p.stroke(255, 0, 0);
+        // this.p.strokeWeight(2);
+        // this.p.line(midpoint.x, midpoint.y, midpoint.x + normal.x * 20, midpoint.y + normal.y * 20);
+        let angle = normal.heading();
+        return angle;
+
+        // let direction = p5.Vector.sub(pos2, pos1);
+        // let angle = direction.heading() + this.p.HALF_PI;
+        // return angle;
     }
 
     setup() {
@@ -45,28 +56,16 @@ export class Splitter {
         console.log("Center", this.pos);
         const center: p5.Vector = this.pos.copy();
 
-        this.p.strokeWeight(this.width);
-        this.p.stroke(this.p.color(255, 0, 0, 255));
-        this.p.point(center.x, center.y);
         
-        let pos1: p5.Vector = this.p.createVector(center.x + this.size * this.p.cos(0),
-                                                  center.y + this.size * this.p.sin(0));
+        let pos1: p5.Vector = this.p.createVector(center.x + this.size * Math.cos(0),
+                                                  center.y + this.size * Math.sin(0));
 
-        let pos2: p5.Vector = this.p.createVector(center.x + this.size * this.p.cos(angleOffsetRadians),
-                                                  center.y + this.size * this.p.sin(angleOffsetRadians));
+        let pos2: p5.Vector = this.p.createVector(center.x + this.size * Math.cos(angleOffsetRadians),
+                                                  center.y + this.size * Math.sin(angleOffsetRadians));
 
-        let pos3: p5.Vector = this.p.createVector(center.x + this.size * this.p.cos(angleOffsetRadians * 2),
-                                                  center.y + this.size * this.p.sin(angleOffsetRadians * 2));
+        let pos3: p5.Vector = this.p.createVector(center.x + this.size * Math.cos(angleOffsetRadians * 2),
+                                                  center.y + this.size * Math.sin(angleOffsetRadians * 2));
 
-
-        console.log('Pos1:', pos1.x, ',', pos1.y,'\n',
-                    'Pos2:', pos2.x, ',', pos2.y,'\n',
-                    'Pos3:', pos3.x, ',', pos3.y,'\n')
-
-        this.p.stroke(this.p.color(255, 0, 0, 255));
-        this.p.point(pos1.x, pos1.y);
-        this.p.point(pos2.x, pos2.y);
-        this.p.point(pos3.x, pos3.y);
 
         let mid1: p5.Vector = p5.Vector.lerp(pos1, pos2, 0.5);
         let mid2: p5.Vector = p5.Vector.lerp(pos2, pos3, 0.5);
@@ -75,13 +74,13 @@ export class Splitter {
         let normal1: number = this.calculateNormal(pos1, pos2);
         let normal2: number = this.calculateNormal(pos2, pos3);
         let normal3: number = this.calculateNormal(pos3, pos1);
-       
+
         this.parts.push(new SplitterPart(this.p, this.sketch, pos1, pos2, this.color, [mid2, normal2], [mid3, normal3]));
         this.parts.push(new SplitterPart(this.p, this.sketch, pos2, pos3, this.color, [mid3, normal3], [mid1, normal1]));
         this.parts.push(new SplitterPart(this.p, this.sketch, pos3, pos1, this.color, [mid1, normal1], [mid2, normal2]));
 
         this.parts.forEach((part) => {
-            this.sketch.colliders.push(part);
+            this.sketch.colliders.push(part);            
         });
     }
 }
@@ -111,21 +110,42 @@ export class SplitterPart extends Collider {
         this.p.fill(this.color);
         this.p.stroke(this.color);
         this.p.strokeWeight(this.width);
-        this.p.line(this.pos1.x, this.pos1.y, this.pos2.x, this.pos2.y);
+        this.p.line(this.pos1.x, this.pos1.y, this.pos2.x, this.pos2.y);        
     }
 
-  onCollision(ray: any, dir: p5.Vector) {
+  onCollision(ray: any, dir: p5.Vector): number {
+    this.sketch.p.frameRate(2);  // Debug
+    
+    // Display the exit normals
+    const exitLineLen: number = 50;
+    this.p.strokeWeight(12);
+
+    this.p.stroke(0, 255, 0); // Exit 1 is green
+    this.p.line(this.exit1[0].x, this.exit1[0].y, this.exit1[0].x + this.p.cos(this.exit1[1]) * exitLineLen, this.exit1[0].y + this.p.sin(this.exit1[1]) * exitLineLen);
+    
+    this.p.stroke(0, 0, 255); // Exit 2 is blue
+    this.p.line(this.exit2[0].x, this.exit2[0].y, this.exit2[0].x + this.p.cos(this.exit2[1]) * exitLineLen, this.exit2[0].y + this.p.sin(this.exit2[1]) * exitLineLen);
+
+
+    
+    // This runs if the ray cap is hit
     if (this.sketch.rays.length > this.sketch.maxRays) {
         ray.pos = this.exit1[0].copy();
         ray.angle = this.exit1[1];
         return ray.angle;
     }
 
+    // create new ray - This works fine
+    // UNCOMMENT THIS IS ONLY DISABLED FOR DEBUGGING AND IT WORKS FINE
     let newRay = new LightRay(this.p, this.exit1[0].copy(), this.exit1[1], this.color);
     this.sketch.rays.push(newRay);
-    ray.pos = this.exit2[0].copy();
+
+    // Edit the current rayy  - This works (i think, its the drawing thats the issue)
+    ray.pos.set(this.exit2[0].copy());
     ray.angle = this.exit2[1];
 
+    ray.teleportIndex = ray.path.length;
+    
     return ray.angle;
   }
 }
