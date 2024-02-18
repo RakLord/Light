@@ -1,0 +1,35 @@
+html, body {
+  background-color: #191919;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+main {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: auto;
+  display: flex;
+}
+
+.p5-canvas {
+  border: 1px solid #656565;
+  margin: auto;
+}
+
+.info-text {
+  color: #fff;
+  padding-top: 10px;
+  position: absolute;
+  top: 0;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  padding: 0;
+}
+
+/*# sourceMappingURL=index.c92073ef.css.map */

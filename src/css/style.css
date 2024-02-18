@@ -1,0 +1,33 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  background-color: #191919;
+}
+
+main {
+  margin: auto;
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.p5-canvas {
+  border: 1px solid #656565;
+  margin: auto;
+}
+
+.info-text {
+  position: absolute;
+  top: 0;
+  padding-top: 10px;
+  color: white;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  padding: 0;
+}
